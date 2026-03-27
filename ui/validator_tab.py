@@ -1,4 +1,5 @@
 import os
+import threading
 
 import customtkinter as ctk
 
@@ -127,27 +128,58 @@ class ValidatorTab:
         self.clear_btn.pack(pady=(10, 0))
 
     def _on_file_dropped(self, path: str):
-        ext = os.path.splitext(path)[1].lower()
-        name = os.path.basename(path)
+        try:
+            ext = os.path.splitext(path)[1].lower()
+            name = os.path.basename(path)
 
-        if ext == ".docx":
-            self.docx_path = path
-            self.docx_label.configure(
-                text=name, text_color=("gray15", "gray85")
-            )
-        elif ext == ".pdf":
-            self.pdf_path = path
-            self.pdf_label.configure(
-                text=name, text_color=("gray15", "gray85")
-            )
+            if ext == ".docx":
+                self.docx_path = path
+                self.docx_label.configure(
+                    text=name, text_color=("gray15", "gray85")
+                )
+            elif ext == ".pdf":
+                self.pdf_path = path
+                self.pdf_label.configure(
+                    text=name, text_color=("gray15", "gray85")
+                )
+            else:
+                return
 
-        # Auto-validate when both files are present
-        if self.docx_path and self.pdf_path:
-            self._run_validation()
+            # Auto-validate when both files are present
+            if self.docx_path and self.pdf_path:
+                self._run_validation()
+        except Exception:
+            pass  # Never crash from drop callback
 
     def _run_validation(self):
-        result_code, message = validate(self.docx_path, self.pdf_path)
+        """Run validation in a background thread to avoid freezing the UI."""
+        # Show a brief "checking" state
+        self.result_icon.configure(text="")
+        self.result_label.configure(
+            text="Checking...",
+            text_color=("gray40", "gray55"),
+        )
+        self.result_detail.configure(text="")
+        self.result_frame.configure(fg_color="transparent")
 
+        docx = self.docx_path
+        pdf = self.pdf_path
+
+        thread = threading.Thread(
+            target=self._validate_thread, args=(docx, pdf), daemon=True
+        )
+        thread.start()
+
+    def _validate_thread(self, docx_path: str, pdf_path: str):
+        """Perform validation off the main thread."""
+        try:
+            result_code, message = validate(docx_path, pdf_path)
+            self.parent.after(0, self._show_result, result_code, message)
+        except Exception as e:
+            self.parent.after(0, self._show_result, Result.ERROR, str(e))
+
+    def _show_result(self, result_code: str, message: str):
+        """Update the UI with the validation result (called on main thread)."""
         if result_code == Result.MATCH:
             self.result_icon.configure(text="\u2705")
             self.result_label.configure(

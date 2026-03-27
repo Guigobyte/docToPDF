@@ -19,6 +19,7 @@ class DropZone(ctk.CTkFrame):
         super().__init__(master, **kwargs)
         self.allowed_extensions = [e.lower() for e in allowed_extensions]
         self.on_drop = on_drop
+        self._reject_timer = None
 
         self.configure(
             corner_radius=12,
@@ -68,7 +69,8 @@ class DropZone(ctk.CTkFrame):
 
     def _browse(self):
         filetypes = [
-            (ext.upper() + " files", f"*{ext}") for ext in self.allowed_extensions
+            (ext.upper().lstrip(".") + " files", f"*{ext}")
+            for ext in self.allowed_extensions
         ]
         filetypes.append(("All files", "*.*"))
         path = filedialog.askopenfilename(filetypes=filetypes)
@@ -76,23 +78,48 @@ class DropZone(ctk.CTkFrame):
             self._handle_file(path)
 
     def _handle_file(self, path: str):
-        ext = os.path.splitext(path)[1].lower()
-        if ext in self.allowed_extensions:
-            if self.on_drop:
-                self.on_drop(path)
-        else:
-            # Flash red border briefly
-            self.configure(border_color="#FF4444")
-            self.after(1500, lambda: self.configure(
-                border_color=("#BBBBBB", "#555555")
-            ))
+        try:
+            ext = os.path.splitext(path)[1].lower()
+            if ext in self.allowed_extensions:
+                if self.on_drop:
+                    self.on_drop(path)
+            else:
+                self._show_rejection(ext)
+        except Exception:
+            pass  # Never crash from file handling
+
+    def _show_rejection(self, ext: str):
+        """Flash red border and show rejection message for wrong file type."""
+        # Cancel any pending reset
+        if self._reject_timer is not None:
+            self.after_cancel(self._reject_timer)
+
+        self.configure(border_color="#FF4444")
+        ext_text = ", ".join(self.allowed_extensions)
+        self.hint_label.configure(
+            text=f"'{ext}' not accepted. Use: {ext_text}",
+            text_color=("#DC2626", "#F87171"),
+        )
+        self._reject_timer = self.after(3000, self._reset_appearance)
+
+    def _reset_appearance(self):
+        """Reset border and hint text to defaults."""
+        self._reject_timer = None
+        self.configure(border_color=("#BBBBBB", "#555555"))
+        ext_text = ", ".join(self.allowed_extensions)
+        self.hint_label.configure(
+            text=f"Accepted: {ext_text}",
+            text_color=("gray55", "gray50"),
+        )
 
     def handle_drop_data(self, data: str):
-        """Parse tkdnd drop data and handle the file."""
-        # tkdnd wraps paths with spaces in {}
-        path = data.strip().strip("{}")
-        if path:
-            self._handle_file(path)
+        """Handle a file path from windnd or tkdnd."""
+        try:
+            path = data.strip().strip("{}")
+            if path and os.path.isfile(path):
+                self._handle_file(path)
+        except Exception:
+            pass  # Never crash from drop data
 
     def set_highlight(self, on: bool):
         if on:

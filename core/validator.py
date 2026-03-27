@@ -1,3 +1,5 @@
+import os
+
 import pikepdf
 
 from core.hashing import sha256_file
@@ -18,22 +20,38 @@ def validate(docx_path: str, pdf_path: str) -> tuple[str, str]:
 
     Returns (result_code, human-readable message).
     """
+    # Check files exist
+    if not os.path.isfile(docx_path):
+        return Result.ERROR, f"DOCX file not found:\n{os.path.basename(docx_path)}"
+    if not os.path.isfile(pdf_path):
+        return Result.ERROR, f"PDF file not found:\n{os.path.basename(pdf_path)}"
+
     try:
         source_hash = sha256_file(docx_path)
-    except (OSError, IOError) as e:
+    except PermissionError:
+        return Result.ERROR, "Cannot read DOCX: file is open in another program."
+    except Exception as e:
         return Result.ERROR, f"Cannot read DOCX: {e}"
 
     try:
+        embedded_hash = None
         with pikepdf.open(pdf_path) as pdf:
             # Try XMP first
-            embedded_hash = None
-            with pdf.open_metadata() as meta:
-                embedded_hash = meta.get(METADATA_KEY_XMP)
+            try:
+                with pdf.open_metadata() as meta:
+                    embedded_hash = meta.get(METADATA_KEY_XMP)
+            except Exception:
+                pass  # XMP metadata may be malformed
             # Fallback to docinfo
             if not embedded_hash:
-                raw = pdf.docinfo.get(METADATA_KEY_DOCINFO)
-                if raw is not None:
-                    embedded_hash = str(raw)
+                try:
+                    raw = pdf.docinfo.get(METADATA_KEY_DOCINFO)
+                    if raw is not None:
+                        embedded_hash = str(raw)
+                except Exception:
+                    pass
+    except PermissionError:
+        return Result.ERROR, "Cannot read PDF: file is open in another program."
     except Exception as e:
         return Result.ERROR, f"Cannot read PDF: {e}"
 

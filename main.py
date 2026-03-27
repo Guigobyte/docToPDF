@@ -55,18 +55,26 @@ class App(ctk.CTk):
 
     def _on_drop(self, file_list):
         """Handle files dropped onto the window."""
-        active_tab = self.tabview.get()
-        for raw_path in file_list:
-            # windnd gives bytes on some versions
-            if isinstance(raw_path, bytes):
-                path = raw_path.decode("utf-8", errors="replace")
-            else:
-                path = str(raw_path)
+        try:
+            active_tab = self.tabview.get()
+            for raw_path in file_list:
+                # windnd gives bytes in Python 3
+                if isinstance(raw_path, bytes):
+                    path = raw_path.decode("utf-8", errors="replace")
+                else:
+                    path = str(raw_path)
 
-            if active_tab == "Convert":
-                self.converter.drop_zone.handle_drop_data(path)
-            elif active_tab == "Validate":
-                self.validator.drop_zone.handle_drop_data(path)
+                # Normalize path separators
+                path = os.path.normpath(path.strip())
+                if not path or not os.path.isfile(path):
+                    continue
+
+                if active_tab == "Convert":
+                    self.converter.drop_zone.handle_drop_data(path)
+                elif active_tab == "Validate":
+                    self.validator.drop_zone.handle_drop_data(path)
+        except Exception:
+            pass  # Never crash the app from a drop event
 
 
 if __name__ == "__main__":
