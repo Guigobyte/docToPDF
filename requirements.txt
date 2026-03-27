@@ -1,0 +1,6 @@
+customtkinter>=5.2.0
+windnd>=1.0.7
+docx2pdf>=0.1.8
+pikepdf>=8.0.0
+pyinstaller>=6.0.0
+pywin32>=306
