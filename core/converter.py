@@ -12,6 +12,17 @@ def convert(docx_path: str) -> str:
     docx_path = Path(docx_path)
     pdf_path = docx_path.with_suffix(".pdf")
 
+    # Check if the output PDF exists and is writable before starting Word
+    if pdf_path.exists():
+        try:
+            with open(pdf_path, "a"):
+                pass  # Just test we can write to it
+        except PermissionError:
+            raise PermissionError(
+                f"Cannot overwrite '{pdf_path.name}'.\n"
+                "The file may be open in another program."
+            )
+
     source_hash = sha256_file(str(docx_path))
 
     # Use win32com directly for more control than docx2pdf wrapper

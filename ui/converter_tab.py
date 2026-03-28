@@ -11,6 +11,7 @@ from ui.drop_zone import DropZone
 class ConverterTab:
     def __init__(self, parent: ctk.CTkFrame):
         self.parent = parent
+        self._pending_path = None
         self._build_ui()
 
     def _build_ui(self):
@@ -66,6 +67,53 @@ class ConverterTab:
         )
         self.result_label.pack(pady=(4, 2))
 
+        # Overwrite prompt frame (hidden initially)
+        self.overwrite_frame = ctk.CTkFrame(
+            self.status_frame, corner_radius=10,
+            fg_color=("#FEF3C7", "#2E2A1A"),
+        )
+
+        ctk.CTkLabel(
+            self.overwrite_frame,
+            text="\u26A0\uFE0F  A PDF already exists for this file.",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color=("#B45309", "#FBBF24"),
+        ).pack(pady=(10, 4))
+
+        self.overwrite_detail = ctk.CTkLabel(
+            self.overwrite_frame,
+            text="",
+            font=ctk.CTkFont(size=11),
+            text_color=("gray40", "gray55"),
+            wraplength=350,
+        )
+        self.overwrite_detail.pack(pady=(0, 8))
+
+        btn_row = ctk.CTkFrame(self.overwrite_frame, fg_color="transparent")
+        btn_row.pack(pady=(0, 10))
+
+        ctk.CTkButton(
+            btn_row,
+            text="Overwrite",
+            width=100,
+            height=30,
+            font=ctk.CTkFont(size=12),
+            fg_color=("#B45309", "#92400E"),
+            hover_color=("#92400E", "#78350F"),
+            command=self._confirm_overwrite,
+        ).pack(side="left", padx=(0, 8))
+
+        ctk.CTkButton(
+            btn_row,
+            text="Cancel",
+            width=80,
+            height=30,
+            font=ctk.CTkFont(size=12),
+            fg_color=("gray70", "gray35"),
+            hover_color=("gray60", "gray45"),
+            command=self._cancel_overwrite,
+        ).pack(side="left")
+
         # Open folder button (hidden initially)
         self.open_btn = ctk.CTkButton(
             self.status_frame,
@@ -85,7 +133,35 @@ class ConverterTab:
         self.file_label.configure(text=f"File: {filename}")
         self.result_label.configure(text="")
         self.open_btn.pack_forget()
+        self.overwrite_frame.pack_forget()
 
+        # Check if output PDF already exists
+        pdf_path = os.path.splitext(path)[0] + ".pdf"
+        if os.path.isfile(pdf_path):
+            self._pending_path = path
+            pdf_name = os.path.basename(pdf_path)
+            self.overwrite_detail.configure(
+                text=f'"{pdf_name}" already exists in the same folder.\nOverwrite it with a new conversion?'
+            )
+            self.overwrite_frame.pack(pady=(4, 4), fill="x", padx=10)
+            return
+
+        self._start_conversion(path)
+
+    def _confirm_overwrite(self):
+        self.overwrite_frame.pack_forget()
+        if self._pending_path:
+            path = self._pending_path
+            self._pending_path = None
+            self._start_conversion(path)
+
+    def _cancel_overwrite(self):
+        self.overwrite_frame.pack_forget()
+        self._pending_path = None
+        self.file_label.configure(text="")
+        self.result_label.configure(text="")
+
+    def _start_conversion(self, path: str):
         # Show progress
         self.progress.pack(pady=(4, 4), fill="x", padx=40)
         self.progress.start()
