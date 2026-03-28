@@ -2,6 +2,7 @@ import sys
 import os
 import logging
 import traceback
+import queue
 
 # --- Crash logger (writes next to the exe / main.py) ----------------------
 _log_dir = os.path.dirname(sys.executable if getattr(sys, "frozen", False)
@@ -26,6 +27,9 @@ except Exception:
 def _global_exception_handler(exc_type, exc_value, exc_tb):
     msg = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
     logging.error("Unhandled exception:\n%s", msg)
+    # Flush immediately so the message is written before process dies
+    for handler in logging.getLogger().handlers:
+        handler.flush()
     sys.__excepthook__(exc_type, exc_value, exc_tb)
 
 sys.excepthook = _global_exception_handler
@@ -72,13 +76,22 @@ class App(ctk.CTk):
         self.converter = ConverterTab(convert_tab)
         self.validator = ValidatorTab(validate_tab)
 
-        # Set up drag-and-drop via windnd (Windows-native, reliable)
+        # Queue for processing dropped files on the main thread.
+        # windnd's native WM_DROPFILES handler MUST NOT call any Tkinter
+        # widget methods (configure, pack, after, etc.) — doing so causes
+        # reentrant Tcl interpreter access and a native crash that bypasses
+        # all Python exception handlers. Instead, we queue file paths and
+        # process them via a safe main-thread polling loop.
+        self._drop_queue = queue.Queue()
         self._setup_dnd()
+        self._poll_drop_queue()
 
     @staticmethod
     def _on_tk_error(exc_type, exc_value, exc_tb):
         msg = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
         logging.error("Tkinter callback error:\n%s", msg)
+        for handler in logging.getLogger().handlers:
+            handler.flush()
 
     def _resource_path(self, *parts):
         base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -92,9 +105,35 @@ class App(ctk.CTk):
         except Exception:
             pass  # Drag-and-drop unavailable; browse button still works
 
-    def _on_drop(self, file_list):
-        """Handle files dropped onto the window via windnd."""
+    def _poll_drop_queue(self):
+        """Process queued file drops on the main thread (safe for Tk calls)."""
         try:
+            while True:
+                path, tab = self._drop_queue.get_nowait()
+                if tab == "Convert":
+                    self.converter.drop_zone.handle_drop_data(path)
+                elif tab == "Validate":
+                    self.validator.drop_zone.handle_drop_data(path)
+        except queue.Empty:
+            pass
+        except Exception:
+            logging.error("Error processing drop:\n%s", traceback.format_exc())
+        self.after(50, self._poll_drop_queue)
+
+    def _on_drop(self, file_list):
+        """Handle files dropped onto the window via windnd.
+
+        CRITICAL: This runs inside windnd's native WM_DROPFILES handler.
+        We MUST NOT call ANY Tkinter/CTk widget methods here (configure,
+        pack, after, event_generate, etc.) — that causes reentrant Tcl
+        interpreter access and an instant native crash with no traceback.
+
+        Only pure-Python operations (string ops, os.path, queue.put) are
+        safe here. All widget work is deferred to _poll_drop_queue().
+        """
+        try:
+            # tabview.get() is safe: returns a stored Python string attribute,
+            # does not call into Tcl.
             active_tab = self.tabview.get()
             for raw_path in file_list:
                 if isinstance(raw_path, bytes):
@@ -104,12 +143,9 @@ class App(ctk.CTk):
                 path = os.path.normpath(path.strip())
                 if not path or not os.path.isfile(path):
                     continue
-                if active_tab == "Convert":
-                    self.converter.drop_zone.handle_drop_data(path)
-                elif active_tab == "Validate":
-                    self.validator.drop_zone.handle_drop_data(path)
+                self._drop_queue.put((path, active_tab))
         except Exception:
-            logging.error("Error in _on_drop:\n%s", traceback.format_exc())
+            pass  # Cannot safely log from inside native handler
 
 
 if __name__ == "__main__":
