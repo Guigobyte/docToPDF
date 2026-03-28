@@ -54,8 +54,8 @@ class App(ctk.CTk):
         self.report_callback_exception = self._on_tk_error
 
         self.title("DocxToPDF")
-        self.geometry("560x580")
-        self.minsize(480, 500)
+        self.geometry("560x560")
+        self.minsize(480, 480)
         self.resizable(True, True)
 
         # Set icon (try root-level .ico, then assets fallback)
