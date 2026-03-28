@@ -7,11 +7,20 @@ import customtkinter as ctk
 from core.converter import convert
 from ui.drop_zone import DropZone
 
+# UI states
+_STATE_IDLE = "idle"
+_STATE_OVERWRITE = "overwrite"
+_STATE_CONVERTING = "converting"
+_STATE_SUCCESS = "success"
+_STATE_ERROR = "error"
+
 
 class ConverterTab:
     def __init__(self, parent: ctk.CTkFrame):
         self.parent = parent
         self._pending_path = None
+        self._output_dir = None
+        self._state = _STATE_IDLE
         self._build_ui()
 
     def _build_ui(self):
@@ -39,39 +48,52 @@ class ConverterTab:
         )
         self.drop_zone.pack(padx=30, pady=(0, 10), fill="x")
 
-        # Status frame
-        self.status_frame = ctk.CTkFrame(
-            self.parent, fg_color="transparent"
-        )
+        # Status area — uses grid so we can grid_remove instead of pack_forget.
+        # grid_remove preserves config so re-showing is a clean grid() call.
+        self.status_frame = ctk.CTkFrame(self.parent, fg_color="transparent")
         self.status_frame.pack(padx=30, fill="x")
+        self.status_frame.columnconfigure(0, weight=1)
 
-        # File name label
+        row = 0
+
+        # Row 0: File name label (always visible when a file is loaded)
         self.file_label = ctk.CTkLabel(
             self.status_frame,
             text="",
             font=ctk.CTkFont(size=12),
             text_color=("gray30", "gray70"),
         )
-        self.file_label.pack(pady=(4, 2))
+        self.file_label.grid(row=row, column=0, pady=(4, 2))
+        self.file_label.grid_remove()
+        row += 1
 
-        # Progress bar
-        self.progress = ctk.CTkProgressBar(self.status_frame, mode="indeterminate")
-        self.progress.pack(pady=(4, 4), fill="x", padx=40)
-        self.progress.pack_forget()  # hidden initially
+        # Row 1: Progress bar (converting state)
+        self.progress = ctk.CTkProgressBar(
+            self.status_frame, mode="indeterminate"
+        )
+        self.progress.grid(row=row, column=0, pady=(4, 4), sticky="ew", padx=40)
+        self.progress.grid_remove()
+        row += 1
 
-        # Result label
+        # Row 2: Result label (success / error state)
         self.result_label = ctk.CTkLabel(
             self.status_frame,
             text="",
             font=ctk.CTkFont(size=13, weight="bold"),
         )
-        self.result_label.pack(pady=(4, 2))
+        self.result_label.grid(row=row, column=0, pady=(4, 2))
+        self.result_label.grid_remove()
+        row += 1
 
-        # Overwrite prompt frame (hidden initially)
+        # Row 3: Overwrite prompt (overwrite state)
         self.overwrite_frame = ctk.CTkFrame(
             self.status_frame, corner_radius=10,
             fg_color=("#FEF3C7", "#2E2A1A"),
         )
+        self.overwrite_frame.grid(
+            row=row, column=0, pady=(4, 4), sticky="ew", padx=10
+        )
+        self.overwrite_frame.grid_remove()
 
         ctk.CTkLabel(
             self.overwrite_frame,
@@ -114,7 +136,9 @@ class ConverterTab:
             command=self._cancel_overwrite,
         ).pack(side="left")
 
-        # Open folder button (hidden initially)
+        row += 1
+
+        # Row 4: Open folder button (success state)
         self.open_btn = ctk.CTkButton(
             self.status_frame,
             text="Open Output Folder",
@@ -123,17 +147,53 @@ class ConverterTab:
             font=ctk.CTkFont(size=12),
             command=self._open_folder,
         )
-        self.open_btn.pack(pady=(4, 0))
-        self.open_btn.pack_forget()
+        self.open_btn.grid(row=row, column=0, pady=(4, 0))
+        self.open_btn.grid_remove()
 
-        self._output_dir = None
+    # -- State transitions ------------------------------------------------
+
+    def _set_state(self, state: str):
+        """Transition to a new UI state, showing/hiding the right widgets."""
+        if state == self._state:
+            return
+        old = self._state
+        self._state = state
+
+        # Hide widgets from old state
+        if old == _STATE_OVERWRITE:
+            self.overwrite_frame.grid_remove()
+        elif old == _STATE_CONVERTING:
+            self.progress.stop()
+            self.progress.grid_remove()
+        elif old == _STATE_SUCCESS:
+            self.result_label.grid_remove()
+            self.open_btn.grid_remove()
+        elif old == _STATE_ERROR:
+            self.result_label.grid_remove()
+
+        # Show widgets for new state
+        if state == _STATE_IDLE:
+            self.file_label.grid_remove()
+        elif state == _STATE_OVERWRITE:
+            self.file_label.grid()
+            self.overwrite_frame.grid()
+        elif state == _STATE_CONVERTING:
+            self.file_label.grid()
+            self.progress.grid()
+            self.progress.start()
+        elif state == _STATE_SUCCESS:
+            self.file_label.grid()
+            self.result_label.grid()
+            self.open_btn.grid()
+        elif state == _STATE_ERROR:
+            self.file_label.grid()
+            self.result_label.grid()
+
+    # -- Drop handling ----------------------------------------------------
 
     def _on_file_dropped(self, path: str):
         filename = os.path.basename(path)
         self.file_label.configure(text=f"File: {filename}")
-        self.result_label.configure(text="")
-        self.open_btn.pack_forget()
-        self.overwrite_frame.pack_forget()
 
         # Check if output PDF already exists
         pdf_path = os.path.splitext(path)[0] + ".pdf"
@@ -141,32 +201,28 @@ class ConverterTab:
             self._pending_path = path
             pdf_name = os.path.basename(pdf_path)
             self.overwrite_detail.configure(
-                text=f'"{pdf_name}" already exists in the same folder.\nOverwrite it with a new conversion?'
+                text=f'"{pdf_name}" already exists in the same folder.\n'
+                     f'Overwrite it with a new conversion?'
             )
-            self.overwrite_frame.pack(pady=(4, 4), fill="x", padx=10)
+            self._set_state(_STATE_OVERWRITE)
             return
 
         self._start_conversion(path)
 
     def _confirm_overwrite(self):
-        self.overwrite_frame.pack_forget()
         if self._pending_path:
             path = self._pending_path
             self._pending_path = None
             self._start_conversion(path)
 
     def _cancel_overwrite(self):
-        self.overwrite_frame.pack_forget()
         self._pending_path = None
-        self.file_label.configure(text="")
-        self.result_label.configure(text="")
+        self._set_state(_STATE_IDLE)
+
+    # -- Conversion -------------------------------------------------------
 
     def _start_conversion(self, path: str):
-        # Show progress
-        self.progress.pack(pady=(4, 4), fill="x", padx=40)
-        self.progress.start()
-
-        # Run conversion in background thread
+        self._set_state(_STATE_CONVERTING)
         thread = threading.Thread(target=self._convert, args=(path,), daemon=True)
         thread.start()
 
@@ -180,33 +236,32 @@ class ConverterTab:
             self.parent.after(
                 0,
                 self._show_error,
-                "Microsoft Word is required for conversion.\nPlease install Word and try again.",
+                "Microsoft Word is required for conversion.\n"
+                "Please install Word and try again.",
             )
         except PermissionError:
             self.parent.after(
                 0,
                 self._show_error,
-                "File is open in another program.\nClose it and try again.",
+                "File is open in another program.\n"
+                "Close it and try again.",
             )
         except Exception as e:
             self.parent.after(0, self._show_error, f"Conversion failed:\n{e}")
 
     def _show_success(self, output_name: str):
-        self.progress.stop()
-        self.progress.pack_forget()
         self.result_label.configure(
             text=f"\u2705  Saved: {output_name}",
             text_color=("#1B8C3A", "#4ADE80"),
         )
-        self.open_btn.pack(pady=(4, 0))
+        self._set_state(_STATE_SUCCESS)
 
     def _show_error(self, message: str):
-        self.progress.stop()
-        self.progress.pack_forget()
         self.result_label.configure(
             text=f"\u274C  {message}",
             text_color=("#DC2626", "#F87171"),
         )
+        self._set_state(_STATE_ERROR)
 
     def _open_folder(self):
         if self._output_dir and os.path.isdir(self._output_dir):
