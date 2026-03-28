@@ -16,7 +16,7 @@ def convert(docx_path: str) -> str:
     if pdf_path.exists():
         try:
             with open(pdf_path, "a"):
-                pass  # Just test we can write to it
+                pass
         except PermissionError:
             raise PermissionError(
                 f"Cannot overwrite '{pdf_path.name}'.\n"
@@ -25,7 +25,6 @@ def convert(docx_path: str) -> str:
 
     source_hash = sha256_file(str(docx_path))
 
-    # Use win32com directly for more control than docx2pdf wrapper
     try:
         import pythoncom
         import win32com.client
@@ -36,6 +35,8 @@ def convert(docx_path: str) -> str:
         )
 
     pythoncom.CoInitialize()
+    word = None
+    doc = None
     try:
         try:
             word = win32com.client.DispatchEx("Word.Application")
@@ -45,31 +46,42 @@ def convert(docx_path: str) -> str:
                 "Please ensure the desktop version of Microsoft Word is installed.\n"
                 "(The Microsoft Store version is not supported.)"
             )
+
         word.Visible = False
         word.DisplayAlerts = False
-        try:
-            doc = word.Documents.Open(
-                str(docx_path.resolve()),
-                ReadOnly=True,
-                AddToRecentFiles=False,
-            )
-            doc.SaveAs2(
-                str(pdf_path.resolve()),
-                FileFormat=17,  # wdFormatPDF
-            )
-            doc.Close(SaveChanges=False)
-        finally:
-            word.Quit()
+
+        doc = word.Documents.Open(
+            str(docx_path.resolve()),
+            ReadOnly=True,
+            AddToRecentFiles=False,
+        )
+        doc.SaveAs2(
+            str(pdf_path.resolve()),
+            FileFormat=17,  # wdFormatPDF
+        )
     finally:
+        # Close document and Word in reverse order, guarding each step
+        if doc is not None:
+            try:
+                doc.Close(SaveChanges=False)
+            except Exception:
+                pass
+        if word is not None:
+            try:
+                word.Quit()
+            except Exception:
+                pass
         pythoncom.CoUninitialize()
 
     # Embed the source hash into PDF metadata
-    with pikepdf.open(str(pdf_path), allow_overwriting_input=True) as pdf:
-        # Write to Document Info dictionary
-        pdf.docinfo[METADATA_KEY] = source_hash
-        # Also write to XMP metadata
-        with pdf.open_metadata() as meta:
-            meta["pdfx:DocToPDFSourceHash"] = source_hash
-        pdf.save(str(pdf_path))
+    try:
+        with pikepdf.open(str(pdf_path), allow_overwriting_input=True) as pdf:
+            pdf.docinfo[METADATA_KEY] = source_hash
+            with pdf.open_metadata() as meta:
+                meta["pdfx:DocToPDFSourceHash"] = source_hash
+            pdf.save(str(pdf_path))
+    except Exception:
+        # PDF was created but metadata embedding failed — still usable
+        pass
 
     return str(pdf_path)

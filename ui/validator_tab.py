@@ -1,5 +1,7 @@
+import logging
 import os
 import threading
+import traceback
 
 import customtkinter as ctk
 
@@ -149,7 +151,8 @@ class ValidatorTab:
             if self.docx_path and self.pdf_path:
                 self._run_validation()
         except Exception:
-            pass  # Never crash from drop callback
+            logging.error("Error in _on_file_dropped:\n%s",
+                          traceback.format_exc())
 
     def _run_validation(self):
         """Run validation in a background thread to avoid freezing the UI."""
@@ -212,15 +215,18 @@ class ValidatorTab:
         self.result_detail.configure(text=message)
 
     def _clear(self):
-        self.docx_path = None
-        self.pdf_path = None
-        self.docx_label.configure(
-            text="Waiting...", text_color=("gray50", "gray50")
-        )
-        self.pdf_label.configure(
-            text="Waiting...", text_color=("gray50", "gray50")
-        )
-        self.result_icon.configure(text="")
-        self.result_label.configure(text="")
-        self.result_detail.configure(text="")
-        self.result_frame.configure(fg_color="transparent")
+        try:
+            self.docx_path = None
+            self.pdf_path = None
+            self.docx_label.configure(
+                text="Waiting...", text_color=("gray50", "gray50")
+            )
+            self.pdf_label.configure(
+                text="Waiting...", text_color=("gray50", "gray50")
+            )
+            self.result_icon.configure(text="")
+            self.result_label.configure(text="")
+            self.result_detail.configure(text="")
+            self.result_frame.configure(fg_color="transparent")
+        except Exception:
+            logging.error("Error in _clear:\n%s", traceback.format_exc())

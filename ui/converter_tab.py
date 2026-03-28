@@ -1,18 +1,12 @@
+import logging
 import os
-import subprocess
 import threading
+import traceback
 
 import customtkinter as ctk
 
 from core.converter import convert
 from ui.drop_zone import DropZone
-
-# UI states
-_STATE_IDLE = "idle"
-_STATE_OVERWRITE = "overwrite"
-_STATE_CONVERTING = "converting"
-_STATE_SUCCESS = "success"
-_STATE_ERROR = "error"
 
 
 class ConverterTab:
@@ -20,7 +14,7 @@ class ConverterTab:
         self.parent = parent
         self._pending_path = None
         self._output_dir = None
-        self._state = _STATE_IDLE
+        self._converting = False
         self._build_ui()
 
     def _build_ui(self):
@@ -48,62 +42,63 @@ class ConverterTab:
         )
         self.drop_zone.pack(padx=30, pady=(0, 10), fill="x")
 
-        # Status area — uses grid so we can grid_remove instead of pack_forget.
-        # grid_remove preserves config so re-showing is a clean grid() call.
+        # --- Status area: all widgets always packed, visibility via text ---
         self.status_frame = ctk.CTkFrame(self.parent, fg_color="transparent")
         self.status_frame.pack(padx=30, fill="x")
-        self.status_frame.columnconfigure(0, weight=1)
 
-        row = 0
-
-        # Row 0: File name label (always visible when a file is loaded)
+        # File name label (always present, empty when idle)
         self.file_label = ctk.CTkLabel(
             self.status_frame,
             text="",
             font=ctk.CTkFont(size=12),
             text_color=("gray30", "gray70"),
         )
-        self.file_label.grid(row=row, column=0, pady=(4, 2))
-        self.file_label.grid_remove()
-        row += 1
+        self.file_label.pack(pady=(4, 2))
 
-        # Row 1: Progress bar (converting state)
-        self.progress = ctk.CTkProgressBar(
-            self.status_frame, mode="indeterminate"
-        )
-        self.progress.grid(row=row, column=0, pady=(4, 4), sticky="ew", padx=40)
-        self.progress.grid_remove()
-        row += 1
-
-        # Row 2: Result label (success / error state)
+        # Result label (always present, empty when idle)
         self.result_label = ctk.CTkLabel(
             self.status_frame,
             text="",
             font=ctk.CTkFont(size=13, weight="bold"),
         )
-        self.result_label.grid(row=row, column=0, pady=(4, 2))
-        self.result_label.grid_remove()
-        row += 1
+        self.result_label.pack(pady=(4, 2))
 
-        # Row 3: Overwrite prompt (overwrite state)
-        self.overwrite_frame = ctk.CTkFrame(
-            self.status_frame, corner_radius=10,
+        # Progress bar — this is the ONE widget we show/hide because
+        # CTkProgressBar has no "empty" state. We use a wrapper frame
+        # so we only ever pack_forget/pack the wrapper, not the progress
+        # bar itself (avoids CTk internal state issues).
+        self._progress_wrapper = ctk.CTkFrame(
+            self.status_frame, fg_color="transparent", height=0
+        )
+        self._progress_wrapper.pack(fill="x", padx=40)
+        self._progress_wrapper.pack_propagate(False)  # don't expand when empty
+        self.progress = ctk.CTkProgressBar(
+            self._progress_wrapper, mode="indeterminate"
+        )
+        # progress is NOT packed yet — we pack it when needed
+
+        # Overwrite prompt — always present, content toggled via visibility.
+        # Uses a wrapper frame that collapses when empty.
+        self._overwrite_wrapper = ctk.CTkFrame(
+            self.status_frame, fg_color="transparent", height=0
+        )
+        self._overwrite_wrapper.pack(fill="x", padx=10)
+        self._overwrite_wrapper.pack_propagate(False)
+
+        self.overwrite_inner = ctk.CTkFrame(
+            self._overwrite_wrapper, corner_radius=10,
             fg_color=("#FEF3C7", "#2E2A1A"),
         )
-        self.overwrite_frame.grid(
-            row=row, column=0, pady=(4, 4), sticky="ew", padx=10
-        )
-        self.overwrite_frame.grid_remove()
 
         ctk.CTkLabel(
-            self.overwrite_frame,
+            self.overwrite_inner,
             text="\u26A0\uFE0F  A PDF already exists for this file.",
             font=ctk.CTkFont(size=13, weight="bold"),
             text_color=("#B45309", "#FBBF24"),
         ).pack(pady=(10, 4))
 
         self.overwrite_detail = ctk.CTkLabel(
-            self.overwrite_frame,
+            self.overwrite_inner,
             text="",
             font=ctk.CTkFont(size=11),
             text_color=("gray40", "gray55"),
@@ -111,7 +106,7 @@ class ConverterTab:
         )
         self.overwrite_detail.pack(pady=(0, 8))
 
-        btn_row = ctk.CTkFrame(self.overwrite_frame, fg_color="transparent")
+        btn_row = ctk.CTkFrame(self.overwrite_inner, fg_color="transparent")
         btn_row.pack(pady=(0, 10))
 
         ctk.CTkButton(
@@ -136,93 +131,120 @@ class ConverterTab:
             command=self._cancel_overwrite,
         ).pack(side="left")
 
-        row += 1
+        # Open folder button (always present, hidden via empty text trick
+        # doesn't work for buttons — use wrapper)
+        self._open_wrapper = ctk.CTkFrame(
+            self.status_frame, fg_color="transparent", height=0
+        )
+        self._open_wrapper.pack(fill="x")
+        self._open_wrapper.pack_propagate(False)
 
-        # Row 4: Open folder button (success state)
         self.open_btn = ctk.CTkButton(
-            self.status_frame,
+            self._open_wrapper,
             text="Open Output Folder",
             width=140,
             height=30,
             font=ctk.CTkFont(size=12),
             command=self._open_folder,
         )
-        self.open_btn.grid(row=row, column=0, pady=(4, 0))
-        self.open_btn.grid_remove()
 
-    # -- State transitions ------------------------------------------------
+    # -- Widget show/hide helpers using wrapper frames --------------------
+    # Instead of pack_forget on CTk widgets directly (which can leak state),
+    # we pack/unpack the child INSIDE a fixed wrapper frame.
 
-    def _set_state(self, state: str):
-        """Transition to a new UI state, showing/hiding the right widgets."""
-        if state == self._state:
-            return
-        old = self._state
-        self._state = state
+    def _show_progress(self):
+        self._progress_wrapper.configure(height=30)
+        self.progress.pack(pady=(4, 4), fill="x")
+        self.progress.start()
 
-        # Hide widgets from old state
-        if old == _STATE_OVERWRITE:
-            self.overwrite_frame.grid_remove()
-        elif old == _STATE_CONVERTING:
-            self.progress.stop()
-            self.progress.grid_remove()
-        elif old == _STATE_SUCCESS:
-            self.result_label.grid_remove()
-            self.open_btn.grid_remove()
-        elif old == _STATE_ERROR:
-            self.result_label.grid_remove()
+    def _hide_progress(self):
+        self.progress.stop()
+        self.progress.pack_forget()
+        self._progress_wrapper.configure(height=0)
 
-        # Show widgets for new state
-        if state == _STATE_IDLE:
-            self.file_label.grid_remove()
-        elif state == _STATE_OVERWRITE:
-            self.file_label.grid()
-            self.overwrite_frame.grid()
-        elif state == _STATE_CONVERTING:
-            self.file_label.grid()
-            self.progress.grid()
-            self.progress.start()
-        elif state == _STATE_SUCCESS:
-            self.file_label.grid()
-            self.result_label.grid()
-            self.open_btn.grid()
-        elif state == _STATE_ERROR:
-            self.file_label.grid()
-            self.result_label.grid()
+    def _show_overwrite(self):
+        self._overwrite_wrapper.configure(height=160)
+        self.overwrite_inner.pack(pady=(4, 4), fill="x")
+
+    def _hide_overwrite(self):
+        self.overwrite_inner.pack_forget()
+        self._overwrite_wrapper.configure(height=0)
+
+    def _show_open_btn(self):
+        self._open_wrapper.configure(height=36)
+        self.open_btn.pack(pady=(4, 0))
+
+    def _hide_open_btn(self):
+        self.open_btn.pack_forget()
+        self._open_wrapper.configure(height=0)
+
+    # -- Reset everything to idle -----------------------------------------
+
+    def _reset_ui(self):
+        """Clear all status indicators back to idle."""
+        self.file_label.configure(text="")
+        self.result_label.configure(text="")
+        self._hide_progress()
+        self._hide_overwrite()
+        self._hide_open_btn()
 
     # -- Drop handling ----------------------------------------------------
 
     def _on_file_dropped(self, path: str):
-        filename = os.path.basename(path)
-        self.file_label.configure(text=f"File: {filename}")
+        try:
+            # Ignore drops while a conversion is running
+            if self._converting:
+                return
 
-        # Check if output PDF already exists
-        pdf_path = os.path.splitext(path)[0] + ".pdf"
-        if os.path.isfile(pdf_path):
-            self._pending_path = path
-            pdf_name = os.path.basename(pdf_path)
-            self.overwrite_detail.configure(
-                text=f'"{pdf_name}" already exists in the same folder.\n'
-                     f'Overwrite it with a new conversion?'
-            )
-            self._set_state(_STATE_OVERWRITE)
-            return
+            self._reset_ui()
 
-        self._start_conversion(path)
+            filename = os.path.basename(path)
+            self.file_label.configure(text=f"File: {filename}")
+
+            # Check if output PDF already exists
+            pdf_path = os.path.splitext(path)[0] + ".pdf"
+            if os.path.isfile(pdf_path):
+                self._pending_path = path
+                pdf_name = os.path.basename(pdf_path)
+                self.overwrite_detail.configure(
+                    text=f'"{pdf_name}" already exists in the same '
+                         f'folder.\nOverwrite it with a new conversion?'
+                )
+                self._show_overwrite()
+                return
+
+            self._start_conversion(path)
+        except Exception:
+            logging.error("Error in _on_file_dropped:\n%s",
+                          traceback.format_exc())
 
     def _confirm_overwrite(self):
-        if self._pending_path:
-            path = self._pending_path
-            self._pending_path = None
-            self._start_conversion(path)
+        try:
+            self._hide_overwrite()
+            if self._pending_path:
+                path = self._pending_path
+                self._pending_path = None
+                self._start_conversion(path)
+        except Exception:
+            logging.error("Error in _confirm_overwrite:\n%s",
+                          traceback.format_exc())
 
     def _cancel_overwrite(self):
-        self._pending_path = None
-        self._set_state(_STATE_IDLE)
+        try:
+            self._pending_path = None
+            self._reset_ui()
+        except Exception:
+            logging.error("Error in _cancel_overwrite:\n%s",
+                          traceback.format_exc())
 
     # -- Conversion -------------------------------------------------------
 
     def _start_conversion(self, path: str):
-        self._set_state(_STATE_CONVERTING)
+        self._converting = True
+        self._show_progress()
+        # daemon=True is intentional: if user closes the app during conversion,
+        # the thread is killed. The converter.py finally block handles COM cleanup
+        # (word.Quit + CoUninitialize) so Word won't be left as a zombie.
         thread = threading.Thread(target=self._convert, args=(path,), daemon=True)
         thread.start()
 
@@ -247,22 +269,34 @@ class ConverterTab:
                 "Close it and try again.",
             )
         except Exception as e:
+            logging.error("Conversion error:\n%s", traceback.format_exc())
             self.parent.after(0, self._show_error, f"Conversion failed:\n{e}")
 
     def _show_success(self, output_name: str):
-        self.result_label.configure(
-            text=f"\u2705  Saved: {output_name}",
-            text_color=("#1B8C3A", "#4ADE80"),
-        )
-        self._set_state(_STATE_SUCCESS)
+        try:
+            self._converting = False
+            self._hide_progress()
+            self.result_label.configure(
+                text=f"\u2705  Saved: {output_name}",
+                text_color=("#1B8C3A", "#4ADE80"),
+            )
+            self._show_open_btn()
+        except Exception:
+            logging.error("Error in _show_success:\n%s",
+                          traceback.format_exc())
 
     def _show_error(self, message: str):
-        self.result_label.configure(
-            text=f"\u274C  {message}",
-            text_color=("#DC2626", "#F87171"),
-        )
-        self._set_state(_STATE_ERROR)
+        try:
+            self._converting = False
+            self._hide_progress()
+            self.result_label.configure(
+                text=f"\u274C  {message}",
+                text_color=("#DC2626", "#F87171"),
+            )
+        except Exception:
+            logging.error("Error in _show_error:\n%s",
+                          traceback.format_exc())
 
     def _open_folder(self):
         if self._output_dir and os.path.isdir(self._output_dir):
-            subprocess.Popen(["explorer", os.path.normpath(self._output_dir)])
+            os.startfile(os.path.normpath(self._output_dir))

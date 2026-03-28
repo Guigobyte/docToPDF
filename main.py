@@ -1,7 +1,36 @@
 import sys
 import os
+import logging
+import traceback
 
-# Ensure bundled app can find its modules
+# --- Crash logger (writes next to the exe / main.py) ----------------------
+_log_dir = os.path.dirname(sys.executable if getattr(sys, "frozen", False)
+                           else os.path.abspath(__file__))
+_log_file = os.path.join(_log_dir, "docToPDF_crash.log")
+try:
+    logging.basicConfig(
+        filename=_log_file,
+        level=logging.ERROR,
+        format="%(asctime)s  %(message)s",
+    )
+except Exception:
+    # Fall back to temp dir if exe dir is read-only (e.g. Program Files)
+    import tempfile
+    _log_file = os.path.join(tempfile.gettempdir(), "docToPDF_crash.log")
+    logging.basicConfig(
+        filename=_log_file,
+        level=logging.ERROR,
+        format="%(asctime)s  %(message)s",
+    )
+
+def _global_exception_handler(exc_type, exc_value, exc_tb):
+    msg = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+    logging.error("Unhandled exception:\n%s", msg)
+    sys.__excepthook__(exc_type, exc_value, exc_tb)
+
+sys.excepthook = _global_exception_handler
+
+# --- Bootstrap for frozen (PyInstaller) builds ----------------------------
 if getattr(sys, "frozen", False):
     os.chdir(os.path.dirname(sys.executable))
     if hasattr(sys, "_MEIPASS"):
@@ -16,6 +45,9 @@ from ui.validator_tab import ValidatorTab
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
+
+        # Catch tkinter callback exceptions to the log file
+        self.report_callback_exception = self._on_tk_error
 
         self.title("DocToPDF")
         self.geometry("600x580")
@@ -41,6 +73,11 @@ class App(ctk.CTk):
         # Set up drag-and-drop via windnd (Windows-native, reliable)
         self._setup_dnd()
 
+    @staticmethod
+    def _on_tk_error(exc_type, exc_value, exc_tb):
+        msg = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        logging.error("Tkinter callback error:\n%s", msg)
+
     def _resource_path(self, *parts):
         base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
         return os.path.join(base, *parts)
@@ -57,8 +94,7 @@ class App(ctk.CTk):
         """Handle files dropped onto the window.
 
         windnd calls this from inside a Windows message handler.
-        We must NOT do UI work here — defer everything to the
-        tkinter event loop via after() to avoid corrupting state.
+        Defer all UI work to the tkinter event loop via after().
         """
         try:
             paths = []
@@ -73,7 +109,7 @@ class App(ctk.CTk):
             if paths:
                 self.after(0, self._process_dropped_files, paths)
         except Exception:
-            pass
+            logging.error("Error in _on_drop:\n%s", traceback.format_exc())
 
     def _process_dropped_files(self, paths: list[str]):
         """Process dropped files on the main tkinter thread."""
@@ -85,7 +121,8 @@ class App(ctk.CTk):
                 elif active_tab == "Validate":
                     self.validator.drop_zone.handle_drop_data(path)
         except Exception:
-            pass
+            logging.error("Error in _process_dropped_files:\n%s",
+                          traceback.format_exc())
 
 
 if __name__ == "__main__":

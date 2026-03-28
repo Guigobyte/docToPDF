@@ -1,5 +1,7 @@
+import logging
 import os
 import tkinter as tk
+import traceback
 from tkinter import filedialog
 
 import customtkinter as ctk
@@ -74,7 +76,7 @@ class DropZone(ctk.CTkFrame):
         ]
         filetypes.append(("All files", "*.*"))
         path = filedialog.askopenfilename(filetypes=filetypes)
-        if path:
+        if path and isinstance(path, str):
             self._handle_file(path)
 
     def _handle_file(self, path: str):
@@ -86,7 +88,7 @@ class DropZone(ctk.CTkFrame):
             else:
                 self._show_rejection(ext)
         except Exception:
-            pass  # Never crash from file handling
+            logging.error("Error in _handle_file:\n%s", traceback.format_exc())
 
     def _show_rejection(self, ext: str):
         """Flash red border and show rejection message for wrong file type."""
@@ -119,7 +121,8 @@ class DropZone(ctk.CTkFrame):
             if path and os.path.isfile(path):
                 self._handle_file(path)
         except Exception:
-            pass  # Never crash from drop data
+            logging.error("Error in handle_drop_data:\n%s",
+                          traceback.format_exc())
 
     def set_highlight(self, on: bool):
         if on:
