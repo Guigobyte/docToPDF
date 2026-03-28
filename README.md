@@ -1,4 +1,4 @@
-# DocToPDF
+# DocxToPDF
 
 A lightweight Windows desktop application for converting Word documents to PDF and validating that a PDF was generated from a specific Word document.
 
@@ -25,7 +25,7 @@ A lightweight Windows desktop application for converting Word documents to PDF a
 
 ## Installation
 
-Download `DocToPDF.zip` from the [latest release](https://github.com/Guigobyte/docToPDF/releases/latest), extract it, and run `DocToPDF.exe`.
+Download `DocxToPDF.zip` from the [latest release](https://github.com/Guigobyte/docToPDF/releases/latest), extract it, and run `DocxToPDF.exe`.
 
 No installation required — the application is fully portable.
 
@@ -39,7 +39,7 @@ python main.py
 To build the executable:
 
 ```bash
-pyinstaller --name DocToPDF --windowed --noconfirm main.py
+pyinstaller --name DocxToPDF --windowed --icon=DocxToPDF.ico --add-data "DocxToPDF.ico;." --noconfirm main.py
 ```
 
 ## Tech Stack

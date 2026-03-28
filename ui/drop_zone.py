@@ -48,11 +48,10 @@ class DropZone(ctk.CTkFrame):
         )
         self.prompt_label.pack(pady=(0, 6))
 
-        # Allowed types hint
-        ext_text = ", ".join(self.allowed_extensions)
+        # Rejection hint (hidden by default, shown on wrong file type)
         self.hint_label = ctk.CTkLabel(
             self,
-            text=f"Accepted: {ext_text}",
+            text="",
             font=ctk.CTkFont(size=11),
             text_color=("gray55", "gray50"),
         )
@@ -105,14 +104,10 @@ class DropZone(ctk.CTkFrame):
         self._reject_timer = self.after(3000, self._reset_appearance)
 
     def _reset_appearance(self):
-        """Reset border and hint text to defaults."""
+        """Reset border and clear hint text."""
         self._reject_timer = None
         self.configure(border_color=("#BBBBBB", "#555555"))
-        ext_text = ", ".join(self.allowed_extensions)
-        self.hint_label.configure(
-            text=f"Accepted: {ext_text}",
-            text_color=("gray55", "gray50"),
-        )
+        self.hint_label.configure(text="", text_color=("gray55", "gray50"))
 
     def handle_drop_data(self, data: str):
         """Handle a file path from windnd or tkdnd."""

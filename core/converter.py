@@ -4,7 +4,7 @@ import pikepdf
 
 from core.hashing import sha256_file
 
-METADATA_KEY = "/DocToPDFSourceHash"
+METADATA_KEY = "/DocxToPDFSourceHash"
 
 
 def convert(docx_path: str) -> str:
@@ -78,7 +78,7 @@ def convert(docx_path: str) -> str:
         with pikepdf.open(str(pdf_path), allow_overwriting_input=True) as pdf:
             pdf.docinfo[METADATA_KEY] = source_hash
             with pdf.open_metadata() as meta:
-                meta["pdfx:DocToPDFSourceHash"] = source_hash
+                meta["pdfx:DocxToPDFSourceHash"] = source_hash
             pdf.save(str(pdf_path))
     except Exception:
         # PDF was created but metadata embedding failed — still usable

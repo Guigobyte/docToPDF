@@ -6,7 +6,7 @@ import traceback
 # --- Crash logger (writes next to the exe / main.py) ----------------------
 _log_dir = os.path.dirname(sys.executable if getattr(sys, "frozen", False)
                            else os.path.abspath(__file__))
-_log_file = os.path.join(_log_dir, "docToPDF_crash.log")
+_log_file = os.path.join(_log_dir, "DocxToPDF_crash.log")
 try:
     logging.basicConfig(
         filename=_log_file,
@@ -16,7 +16,7 @@ try:
 except Exception:
     # Fall back to temp dir if exe dir is read-only (e.g. Program Files)
     import tempfile
-    _log_file = os.path.join(tempfile.gettempdir(), "docToPDF_crash.log")
+    _log_file = os.path.join(tempfile.gettempdir(), "DocxToPDF_crash.log")
     logging.basicConfig(
         filename=_log_file,
         level=logging.ERROR,
@@ -49,13 +49,15 @@ class App(ctk.CTk):
         # Catch tkinter callback exceptions to the log file
         self.report_callback_exception = self._on_tk_error
 
-        self.title("DocToPDF")
-        self.geometry("600x580")
-        self.minsize(500, 500)
+        self.title("DocxToPDF")
+        self.geometry("560x480")
+        self.minsize(480, 420)
         self.resizable(True, True)
 
-        # Try to set icon
-        icon_path = self._resource_path("assets", "icon.ico")
+        # Set icon (try root-level .ico, then assets fallback)
+        icon_path = self._resource_path("DocxToPDF.ico")
+        if not os.path.exists(icon_path):
+            icon_path = self._resource_path("assets", "icon.ico")
         if os.path.exists(icon_path):
             self.iconbitmap(icon_path)
 

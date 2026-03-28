@@ -22,14 +22,14 @@ class ValidatorTab:
             self.parent,
             text="DOCX vs PDF Validator",
             font=ctk.CTkFont(size=20, weight="bold"),
-        ).pack(pady=(18, 4))
+        ).pack(pady=(14, 2))
 
         ctk.CTkLabel(
             self.parent,
             text="Drop both files to verify the PDF was generated from the DOCX",
             font=ctk.CTkFont(size=12),
             text_color=("gray45", "gray55"),
-        ).pack(pady=(0, 12))
+        ).pack(pady=(0, 8))
 
         # Single drop zone for both file types
         self.drop_zone = DropZone(
@@ -37,13 +37,13 @@ class ValidatorTab:
             allowed_extensions=[".docx", ".pdf"],
             prompt_text="Drop .docx and .pdf files here",
             on_drop=self._on_file_dropped,
-            height=150,
+            height=130,
         )
-        self.drop_zone.pack(padx=30, pady=(0, 10), fill="x")
+        self.drop_zone.pack(padx=24, pady=(0, 8), fill="x")
 
         # File status row
         self.files_frame = ctk.CTkFrame(self.parent, fg_color="transparent")
-        self.files_frame.pack(padx=30, fill="x")
+        self.files_frame.pack(padx=24, fill="x")
         self.files_frame.columnconfigure(0, weight=1)
         self.files_frame.columnconfigure(1, weight=1)
 
@@ -91,7 +91,7 @@ class ValidatorTab:
         self.result_frame = ctk.CTkFrame(
             self.parent, corner_radius=12, fg_color="transparent"
         )
-        self.result_frame.pack(padx=30, pady=(12, 0), fill="x")
+        self.result_frame.pack(padx=24, pady=(8, 0), fill="x")
 
         self.result_icon = ctk.CTkLabel(
             self.result_frame,
@@ -127,7 +127,7 @@ class ValidatorTab:
             hover_color=("gray60", "gray45"),
             command=self._clear,
         )
-        self.clear_btn.pack(pady=(10, 0))
+        self.clear_btn.pack(pady=(6, 0))
 
     def _on_file_dropped(self, path: str):
         try:

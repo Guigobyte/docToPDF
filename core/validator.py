@@ -4,8 +4,8 @@ import pikepdf
 
 from core.hashing import sha256_file
 
-METADATA_KEY_DOCINFO = "/DocToPDFSourceHash"
-METADATA_KEY_XMP = "pdfx:DocToPDFSourceHash"
+METADATA_KEY_DOCINFO = "/DocxToPDFSourceHash"
+METADATA_KEY_XMP = "pdfx:DocxToPDFSourceHash"
 
 
 class Result:
