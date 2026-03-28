@@ -37,7 +37,7 @@ class DropZone(ctk.CTkFrame):
             font=ctk.CTkFont(size=36),
             text_color=("gray50", "gray60"),
         )
-        self.icon_label.pack(pady=(20, 4))
+        self.icon_label.pack(pady=(14, 2))
 
         # Prompt text
         self.prompt_label = ctk.CTkLabel(
@@ -46,7 +46,7 @@ class DropZone(ctk.CTkFrame):
             font=ctk.CTkFont(size=13),
             text_color=("gray40", "gray60"),
         )
-        self.prompt_label.pack(pady=(0, 6))
+        self.prompt_label.pack(pady=(0, 4))
 
         # Rejection hint (hidden by default, shown on wrong file type)
         self.hint_label = ctk.CTkLabel(
@@ -55,18 +55,18 @@ class DropZone(ctk.CTkFrame):
             font=ctk.CTkFont(size=11),
             text_color=("gray55", "gray50"),
         )
-        self.hint_label.pack(pady=(0, 8))
+        self.hint_label.pack(pady=(0, 4))
 
         # Browse button
         self.browse_btn = ctk.CTkButton(
             self,
             text="Browse",
             width=100,
-            height=30,
+            height=28,
             font=ctk.CTkFont(size=12),
             command=self._browse,
         )
-        self.browse_btn.pack(pady=(0, 18))
+        self.browse_btn.pack(pady=(0, 12))
 
     def _browse(self):
         filetypes = [

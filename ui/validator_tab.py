@@ -22,14 +22,14 @@ class ValidatorTab:
             self.parent,
             text="DOCX vs PDF Validator",
             font=ctk.CTkFont(size=20, weight="bold"),
-        ).pack(pady=(14, 2))
+        ).pack(pady=(10, 1))
 
         ctk.CTkLabel(
             self.parent,
             text="Drop both files to verify the PDF was generated from the DOCX",
             font=ctk.CTkFont(size=12),
             text_color=("gray45", "gray55"),
-        ).pack(pady=(0, 8))
+        ).pack(pady=(0, 6))
 
         # Single drop zone for both file types
         self.drop_zone = DropZone(
@@ -37,9 +37,9 @@ class ValidatorTab:
             allowed_extensions=[".docx", ".pdf"],
             prompt_text="Drop .docx and .pdf files here",
             on_drop=self._on_file_dropped,
-            height=130,
+            height=110,
         )
-        self.drop_zone.pack(padx=24, pady=(0, 8), fill="x")
+        self.drop_zone.pack(padx=24, pady=(0, 6), fill="x")
 
         # File status row
         self.files_frame = ctk.CTkFrame(self.parent, fg_color="transparent")
@@ -49,85 +49,85 @@ class ValidatorTab:
 
         # DOCX file indicator
         self.docx_frame = ctk.CTkFrame(self.files_frame, corner_radius=8)
-        self.docx_frame.grid(row=0, column=0, padx=(0, 6), sticky="ew")
+        self.docx_frame.grid(row=0, column=0, padx=(0, 4), sticky="ew")
 
         ctk.CTkLabel(
             self.docx_frame,
             text="DOCX",
             font=ctk.CTkFont(size=11, weight="bold"),
             text_color=("gray40", "gray55"),
-        ).pack(pady=(6, 0))
+        ).pack(pady=(4, 0))
 
         self.docx_label = ctk.CTkLabel(
             self.docx_frame,
             text="Waiting...",
-            font=ctk.CTkFont(size=12),
+            font=ctk.CTkFont(size=11),
             text_color=("gray50", "gray50"),
             wraplength=220,
         )
-        self.docx_label.pack(pady=(0, 6), padx=8)
+        self.docx_label.pack(pady=(0, 4), padx=6)
 
         # PDF file indicator
         self.pdf_frame = ctk.CTkFrame(self.files_frame, corner_radius=8)
-        self.pdf_frame.grid(row=0, column=1, padx=(6, 0), sticky="ew")
+        self.pdf_frame.grid(row=0, column=1, padx=(4, 0), sticky="ew")
 
         ctk.CTkLabel(
             self.pdf_frame,
             text="PDF",
             font=ctk.CTkFont(size=11, weight="bold"),
             text_color=("gray40", "gray55"),
-        ).pack(pady=(6, 0))
+        ).pack(pady=(4, 0))
 
         self.pdf_label = ctk.CTkLabel(
             self.pdf_frame,
             text="Waiting...",
-            font=ctk.CTkFont(size=12),
+            font=ctk.CTkFont(size=11),
             text_color=("gray50", "gray50"),
             wraplength=220,
         )
-        self.pdf_label.pack(pady=(0, 6), padx=8)
+        self.pdf_label.pack(pady=(0, 4), padx=6)
 
         # Result indicator
         self.result_frame = ctk.CTkFrame(
-            self.parent, corner_radius=12, fg_color="transparent"
+            self.parent, corner_radius=10, fg_color="transparent"
         )
-        self.result_frame.pack(padx=24, pady=(8, 0), fill="x")
+        self.result_frame.pack(padx=24, pady=(6, 0), fill="x")
 
         self.result_icon = ctk.CTkLabel(
             self.result_frame,
             text="",
-            font=ctk.CTkFont(size=40),
+            font=ctk.CTkFont(size=28),
         )
-        self.result_icon.pack(pady=(4, 0))
+        self.result_icon.pack(pady=(2, 0))
 
         self.result_label = ctk.CTkLabel(
             self.result_frame,
             text="",
-            font=ctk.CTkFont(size=14, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
         )
-        self.result_label.pack(pady=(2, 0))
+        self.result_label.pack(pady=(1, 0))
 
         self.result_detail = ctk.CTkLabel(
             self.result_frame,
             text="",
-            font=ctk.CTkFont(size=12),
+            font=ctk.CTkFont(size=11),
             text_color=("gray40", "gray55"),
             wraplength=400,
         )
-        self.result_detail.pack(pady=(2, 4))
+        self.result_detail.pack(pady=(1, 2))
 
         # Clear button
         self.clear_btn = ctk.CTkButton(
             self.parent,
             text="Clear",
             width=80,
-            height=28,
+            height=26,
             font=ctk.CTkFont(size=12),
             fg_color=("gray70", "gray35"),
             hover_color=("gray60", "gray45"),
             command=self._clear,
         )
-        self.clear_btn.pack(pady=(6, 0))
+        self.clear_btn.pack(pady=(4, 0))
 
     def _on_file_dropped(self, path: str):
         try:

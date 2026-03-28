@@ -23,14 +23,14 @@ class ConverterTab:
             self.parent,
             text="DOCX \u2192 PDF Converter",
             font=ctk.CTkFont(size=20, weight="bold"),
-        ).pack(pady=(14, 2))
+        ).pack(pady=(10, 1))
 
         ctk.CTkLabel(
             self.parent,
             text="Drop a Word document to convert it to PDF",
             font=ctk.CTkFont(size=12),
             text_color=("gray45", "gray55"),
-        ).pack(pady=(0, 8))
+        ).pack(pady=(0, 6))
 
         # Drop zone
         self.drop_zone = DropZone(
@@ -38,9 +38,9 @@ class ConverterTab:
             allowed_extensions=[".docx"],
             prompt_text="Drop .docx file here or click Browse",
             on_drop=self._on_file_dropped,
-            height=150,
+            height=130,
         )
-        self.drop_zone.pack(padx=24, pady=(0, 8), fill="x")
+        self.drop_zone.pack(padx=24, pady=(0, 6), fill="x")
 
         # --- Status area: all widgets always packed, visibility via text ---
         self.status_frame = ctk.CTkFrame(self.parent, fg_color="transparent")
