@@ -87,16 +87,16 @@ class ValidatorTab:
         )
         self.pdf_label.pack(pady=(0, 4), padx=6)
 
-        # Result indicator
+        # Result indicator (always packed, empty text when idle)
         self.result_frame = ctk.CTkFrame(
             self.parent, corner_radius=10, fg_color="transparent"
         )
-        self.result_frame.pack(padx=24, pady=(6, 0), fill="x")
+        self.result_frame.pack(padx=24, pady=(4, 0), fill="x")
 
         self.result_icon = ctk.CTkLabel(
             self.result_frame,
             text="",
-            font=ctk.CTkFont(size=28),
+            font=ctk.CTkFont(size=24),
         )
         self.result_icon.pack(pady=(2, 0))
 
@@ -105,7 +105,7 @@ class ValidatorTab:
             text="",
             font=ctk.CTkFont(size=13, weight="bold"),
         )
-        self.result_label.pack(pady=(1, 0))
+        self.result_label.pack(pady=(0, 0))
 
         self.result_detail = ctk.CTkLabel(
             self.result_frame,
@@ -114,7 +114,7 @@ class ValidatorTab:
             text_color=("gray40", "gray55"),
             wraplength=400,
         )
-        self.result_detail.pack(pady=(1, 2))
+        self.result_detail.pack(pady=(0, 2))
 
         # Clear button
         self.clear_btn = ctk.CTkButton(
@@ -127,7 +127,7 @@ class ValidatorTab:
             hover_color=("gray60", "gray45"),
             command=self._clear,
         )
-        self.clear_btn.pack(pady=(4, 0))
+        self.clear_btn.pack(pady=(2, 0))
 
     def _on_file_dropped(self, path: str):
         try:
@@ -156,7 +156,6 @@ class ValidatorTab:
 
     def _run_validation(self):
         """Run validation in a background thread to avoid freezing the UI."""
-        # Show a brief "checking" state
         self.result_icon.configure(text="")
         self.result_label.configure(
             text="Checking...",

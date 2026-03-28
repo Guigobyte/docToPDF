@@ -95,7 +95,7 @@ class ConverterTab:
             text="\u26A0\uFE0F  A PDF already exists for this file.",
             font=ctk.CTkFont(size=13, weight="bold"),
             text_color=("#B45309", "#FBBF24"),
-        ).pack(pady=(10, 4))
+        ).pack(pady=(8, 2))
 
         self.overwrite_detail = ctk.CTkLabel(
             self.overwrite_inner,
@@ -104,10 +104,10 @@ class ConverterTab:
             text_color=("gray40", "gray55"),
             wraplength=350,
         )
-        self.overwrite_detail.pack(pady=(0, 8))
+        self.overwrite_detail.pack(pady=(0, 6))
 
         btn_row = ctk.CTkFrame(self.overwrite_inner, fg_color="transparent")
-        btn_row.pack(pady=(0, 10))
+        btn_row.pack(pady=(0, 8))
 
         ctk.CTkButton(
             btn_row,
@@ -163,8 +163,8 @@ class ConverterTab:
         self._progress_wrapper.configure(height=0)
 
     def _show_overwrite(self):
-        self._overwrite_wrapper.configure(height=160)
-        self.overwrite_inner.pack(pady=(4, 4), fill="x")
+        self._overwrite_wrapper.configure(height=130)
+        self.overwrite_inner.pack(pady=(4, 2), fill="x")
 
     def _hide_overwrite(self):
         self.overwrite_inner.pack_forget()

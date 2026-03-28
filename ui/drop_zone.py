@@ -24,7 +24,7 @@ class DropZone(ctk.CTkFrame):
         self._reject_timer = None
 
         self.configure(
-            corner_radius=12,
+            corner_radius=10,
             border_width=2,
             border_color=("#BBBBBB", "#555555"),
             fg_color=("gray92", "gray17"),
@@ -34,39 +34,39 @@ class DropZone(ctk.CTkFrame):
         self.icon_label = ctk.CTkLabel(
             self,
             text="\U0001F4C4",  # document emoji
-            font=ctk.CTkFont(size=36),
+            font=ctk.CTkFont(size=26),
             text_color=("gray50", "gray60"),
         )
-        self.icon_label.pack(pady=(14, 2))
+        self.icon_label.pack(pady=(8, 0))
 
         # Prompt text
         self.prompt_label = ctk.CTkLabel(
             self,
             text=prompt_text,
-            font=ctk.CTkFont(size=13),
+            font=ctk.CTkFont(size=12),
             text_color=("gray40", "gray60"),
         )
-        self.prompt_label.pack(pady=(0, 4))
+        self.prompt_label.pack(pady=(0, 2))
 
-        # Rejection hint (hidden by default, shown on wrong file type)
+        # Rejection hint (only packed when showing a rejection)
         self.hint_label = ctk.CTkLabel(
             self,
             text="",
             font=ctk.CTkFont(size=11),
             text_color=("gray55", "gray50"),
         )
-        self.hint_label.pack(pady=(0, 4))
+        # hint_label is NOT packed — it gets packed in _show_rejection()
 
         # Browse button
         self.browse_btn = ctk.CTkButton(
             self,
             text="Browse",
-            width=100,
-            height=28,
+            width=90,
+            height=26,
             font=ctk.CTkFont(size=12),
             command=self._browse,
         )
-        self.browse_btn.pack(pady=(0, 12))
+        self.browse_btn.pack(pady=(2, 8))
 
     def _browse(self):
         filetypes = [
@@ -101,13 +101,15 @@ class DropZone(ctk.CTkFrame):
             text=f"'{ext}' not accepted. Use: {ext_text}",
             text_color=("#DC2626", "#F87171"),
         )
+        # Pack hint above the browse button
+        self.hint_label.pack(before=self.browse_btn, pady=(0, 0))
         self._reject_timer = self.after(3000, self._reset_appearance)
 
     def _reset_appearance(self):
-        """Reset border and clear hint text."""
+        """Reset border and hide hint text."""
         self._reject_timer = None
         self.configure(border_color=("#BBBBBB", "#555555"))
-        self.hint_label.configure(text="", text_color=("gray55", "gray50"))
+        self.hint_label.pack_forget()
 
     def handle_drop_data(self, data: str):
         """Handle a file path from windnd or tkdnd."""
